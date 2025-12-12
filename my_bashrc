@@ -1,0 +1,30 @@
+# virtual mode
+alias virtual_bringup="ros2 launch dsr_bringup2 dsr_bringup2_rviz.launch.py mode:=virtual host:=127.0.0.1 port:=12345 model:=m0609"
+# real mode
+alias real_bringup="ros2 launch  dsr_bringup2 dsr_bringup2_rviz.launch.py mode:=real host:=192.168.1.100 port:=12345 model:=m0609"
+
+### Custom nodes ###
+# 로봇 집으로 보내기
+alias go_home="ros2 run robot_control go_home"
+# 그리퍼 열기
+alias open_grip="ros2 run robot_control open_grip"
+# 그리퍼 닫기
+alias close_grip="ros2 run robot_control close_grip"
+
+# 특정 패키지만 colcon build
+pkg_build() {
+  if [ -z "$1" ]; then
+    echo "Usage: pkg_build <PKG_NAME>"
+    return 1
+  fi
+  colcon build --packages-select $1 --symlink-install
+}
+
+# 수동 모드[0] / 자동 모드[1] 변경
+change_mode() {
+  if [ -z "$1" ]; then
+    echo "Usage: change_mode <MODE>"
+    return 1
+  fi
+  ros2 service call /dsr01/system/set_robot_mode dsr_msgs2/srv/SetRobotMode robot_mode:\ $1
+}

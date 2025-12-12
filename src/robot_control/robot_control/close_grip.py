@@ -7,11 +7,6 @@ ROBOT_MODEL = "m0609"
 ROBOT_TOOL = "Tool Weight"
 ROBOT_TCP = "GripperDA_v1"
 
-# 이동 속도 및 가속도
-# VELOCITY = 100  # simulation
-VELOCITY = 50   # real
-ACC = 60
-
 # DR_init 설정
 DR_init.__dsr__id = ROBOT_ID
 DR_init.__dsr__model = ROBOT_MODEL
@@ -32,28 +27,24 @@ def initialize_robot():
     print(f"ROBOT_MODEL: {ROBOT_MODEL}")
     print(f"ROBOT_TCP: {ROBOT_TCP}")
     print(f"ROBOT_TOOL: {ROBOT_TOOL}")
-    print(f"VELOCITY: {VELOCITY}")
-    print(f"ACC: {ACC}")
     print("#"*50)
 
 
 def perform_task():
     """로봇이 수행할 작업"""
     print("Performing task...")
-    from DSR_ROBOT2 import movej
+    from DSR_ROBOT2 import set_digital_output
 
-    # Robot coordinates
-    HOME_POSE = [0, 0, 90, 0, 90, 0]
-
-    print("Initializing robot pose")
-    print("[INFO] Returning HOME...")
-    movej(HOME_POSE, vel=VELOCITY, acc=ACC)
+    # Close grip
+    print("[INFO] Closing grip...")
+    set_digital_output(1, 1)
+    set_digital_output(2, 0)
 
 
 def main(args=None):
     """메인 함수: ROS2 노드 초기화 및 동작 수행"""
     rclpy.init(args=args)
-    node = rclpy.create_node("go_home", namespace=ROBOT_ID)
+    node = rclpy.create_node("close_grip", namespace=ROBOT_ID)
 
     # DR_init에 노드 설정
     DR_init.__dsr__node = node
