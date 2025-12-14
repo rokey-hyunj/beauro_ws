@@ -5,3 +5,5 @@ log
 
 # Python cache files
 __pycache__/
+
+coord.txt
