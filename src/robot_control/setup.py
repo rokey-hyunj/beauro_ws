@@ -33,7 +33,8 @@ setup(
             "scooping = robot_control.scooping:main",
             "scoop2 = robot_control.scoop2:main",
             "spoon_flatten = robot_control.spoon_flatten:main",
-            "flatten2 = robot_control.flatten2:main"
+            "flatten2 = robot_control.flatten2:main",
+            "executor = robot_control.executor:main"
         ],
     },
 )

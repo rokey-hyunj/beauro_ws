@@ -38,7 +38,7 @@ def perform_task():
     # Close grip
     print("[INFO] Closing grip...")
     set_digital_output(1, 1)
-    set_digital_output(2, 0)
+    set_digital_output(2, 1)
 
 
 def main(args=None):

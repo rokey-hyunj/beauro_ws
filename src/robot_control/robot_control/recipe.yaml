@@ -1,0 +1,39 @@
+recipe_id: "tray_batch_001"
+
+menu_type:
+  display_name: "foundation"
+
+selection:
+  liquid: liquid_A
+  powder: powder_B
+
+trays:
+  1:
+    count:
+      liquid: 1
+      powder: 2
+
+  2:
+    count:
+      liquid: 2
+      powder: 1
+
+  3:
+    count:
+      liquid: 1
+      powder: 1
+
+  4:
+    count:
+      liquid: 3
+      powder: 1
+
+  5:
+    count:
+      liquid: 1
+      powder: 1
+
+  6:
+    count:
+      liquid: 1
+      powder: 1
