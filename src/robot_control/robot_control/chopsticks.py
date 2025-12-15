@@ -50,17 +50,19 @@ def get_tray_pose(base_pose, tray_idx):
     yt = y - (row * TRAY_PITCH_Y)
     return posx([xt, yt, z, rx, ry, rz])
 
-def offset_posx(pose, dx, dy):
+def make_stir_pose(base_stir, p_tray, TRAY_BASE):
     from DSR_ROBOT2 import posx
-    return posx([
-        pose[0] + dx,
-        pose[1] + dy,
-        pose[2],
-        pose[3],
-        pose[4],
-        pose[5],
-    ])
+    dx = p_tray[0] - TRAY_BASE[0]
+    dy = p_tray[1] - TRAY_BASE[1]
 
+    return posx([
+        base_stir[0] + dx,
+        base_stir[1] + dy,
+        base_stir[2],          # Z는 그대로 (이미 down 기준)
+        base_stir[3],
+        base_stir[4],
+        base_stir[5],
+    ])
 
 def flatten_and_shake(center_pose):
     from DSR_ROBOT2 import movel, posx
@@ -112,7 +114,8 @@ def execute_sticks(library, recipe):
         dy = p_tray[1] - TRAY_BASE[1]
 
         stir_poses_tray = [
-            offset_posx(p, dx, dy) for p in STIR_POSES_BASE
+            make_stir_pose(p, p_tray, TRAY_BASE)
+            for p in STIR_POSES_BASE
         ]
 
         if tray_idx == 1:
