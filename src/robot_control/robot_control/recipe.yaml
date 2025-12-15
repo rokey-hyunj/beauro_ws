@@ -10,13 +10,13 @@ selection:
 trays:
   1:
     count:
-      liquid: 1
-      powder: 2
+      liquid: 2
+      powder: 1
 
   2:
     count:
-      liquid: 2
-      powder: 1
+      liquid: 1
+      powder: 2
 
   3:
     count:
@@ -25,7 +25,7 @@ trays:
 
   4:
     count:
-      liquid: 3
+      liquid: 1
       powder: 1
 
   5:
