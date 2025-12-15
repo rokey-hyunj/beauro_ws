@@ -10,7 +10,7 @@ import threading
 ROBOT_ID = "dsr01"
 ROBOT_MODEL = "m0609"
 ROBOT_TOOL = "Tool Weight"
-ROBOT_TCP = "GripperDA_v1"
+ROBOT_TCP = "GripperDA"
 
 # [업데이트] 속도 설정 (팀원 코드 반영)
 VEL_MOVE = 250
@@ -50,15 +50,16 @@ def get_tray_pose(base_pose, tray_idx):
     yt = y - (row * TRAY_PITCH_Y)
     return posx([xt, yt, z, rx, ry, rz])
 
-def make_stir_pose(base_stir, p_tray, TRAY_BASE):
+def make_stir_pose(base_stir, p_tray_down, TRAY_BASE):
     from DSR_ROBOT2 import posx
-    dx = p_tray[0] - TRAY_BASE[0]
-    dy = p_tray[1] - TRAY_BASE[1]
+
+    dx = p_tray_down[0] - TRAY_BASE[0]
+    dy = p_tray_down[1] - TRAY_BASE[1]
 
     return posx([
         base_stir[0] + dx,
         base_stir[1] + dy,
-        base_stir[2],          # Z는 그대로 (이미 down 기준)
+        p_tray_down[2],
         base_stir[3],
         base_stir[4],
         base_stir[5],
@@ -75,7 +76,7 @@ def flatten_and_shake(center_pose):
     movel(posx([x, y, z, rx, ry, rz]), vel=VEL_MOVE, acc=ACC)
 
 def execute_sticks(library, recipe):
-    from DSR_ROBOT2 import posx, posj, movel, movej
+    from DSR_ROBOT2 import posx, posj, movel, movej, wait, DR_MV_RA_DUPLICATE
 
     HOME_POSE = posj([0, 0, 90, 0, 90, 0])
     stick_poses = library["stick"]
@@ -85,6 +86,8 @@ def execute_sticks(library, recipe):
     TRAY_BASE = posx(stick_poses["tray"]["posx"])
     STIR_POSES_BASE = [posx(p) for p in stick_poses["stir"]["posx"]]
     DROP = posx(stick_poses["drop"]["posx"])
+
+    TRAY_UP_Z, TRAY_DOWN_Z = 550, 427
 
     trays = recipe["trays"]
 
@@ -102,41 +105,27 @@ def execute_sticks(library, recipe):
 
         p_tray = get_tray_pose(TRAY_BASE, tray_idx)
         p_tray_up = posx([
-            p_tray[0], p_tray[1], p_tray[2] + 120,
-            p_tray[3], p_tray[4], p_tray[5]
+            p_tray[0], p_tray[1], TRAY_UP_Z,
+            p_tray[3], p_tray[4], p_tray[5],
         ])
         p_tray_down = posx([
-            p_tray[0], p_tray[1], p_tray[2] - 90,
+            p_tray[0], p_tray[1], TRAY_DOWN_Z,
             p_tray[3], p_tray[4], p_tray[5]
         ])
 
-        dx = p_tray[0] - TRAY_BASE[0]
-        dy = p_tray[1] - TRAY_BASE[1]
-
         stir_poses_tray = [
-            make_stir_pose(p, p_tray, TRAY_BASE)
+            make_stir_pose(p, p_tray_down, TRAY_BASE)
             for p in STIR_POSES_BASE
         ]
 
-        if tray_idx == 1:
-            # 1번 트레이: 기존 방식 유지
-            movel(p_tray, vel=VEL_MOVE, acc=ACC)
-            movel(p_tray_down, vel=VEL_WORK, acc=ACC)
-        else:
-            # 2~6번 트레이: 위에서 접근
-            movel(p_tray_up, vel=VEL_MOVE, acc=ACC)
-            movel(p_tray, vel=VEL_MOVE, acc=ACC)
-            movel(p_tray_down, vel=VEL_WORK, acc=ACC)
+        movel(p_tray_up, vel=VEL_MOVE, acc=ACC)
+        movel(p_tray_down, vel=VEL_WORK, acc=ACC)
 
         for _ in range(3):
             for p in stir_poses_tray:
-                movel(p, vel=VEL_WORK, acc=ACC, radius=10)
+                movel(p, vel=VEL_WORK, acc=ACC, radius=10, ra=DR_MV_RA_DUPLICATE)
 
-        if tray_idx == 1:
-            movel(p_tray, vel=VEL_MOVE, acc=ACC)
-        else:
-            movel(p_tray, vel=VEL_MOVE, acc=ACC)
-            movel(p_tray_up, vel=VEL_MOVE, acc=ACC)
+        movel(p_tray_up, vel=VEL_MOVE, acc=ACC)
 
         movel(DROP, vel=VEL_MOVE, acc=ACC)
         movel(posx([
