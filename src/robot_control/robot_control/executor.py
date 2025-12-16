@@ -386,6 +386,8 @@ def execute_tray(library):
 
 
 def main(args=None):
+    import os
+
     rclpy.init(args=args)
     node = rclpy.create_node("recipe_integration", namespace=ROBOT_ID)
     DR_init.__dsr__node = node
@@ -393,12 +395,10 @@ def main(args=None):
     try:
         initialize_robot()
 
-        # 경로 수정 필요 (실제 로봇 PC 경로로 변경하세요)
-        yaml_path_lib = "/home/hyunjong/beauro_ws/src/robot_control/robot_control/material_library.yaml"
-        yaml_path_recipe = "/home/hyunjong/beauro_ws/src/robot_control/robot_control/recipe.yaml"
-        
-        library = load_yaml(yaml_path_lib)
-        recipe = load_yaml(yaml_path_recipe)
+        BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+        library = load_yaml(os.path.join(BASE_DIR, "material_library.yaml"))
+        recipe = load_yaml(os.path.join(BASE_DIR, "recipe.yaml"))
 
         if library and recipe:
             execute_liquid(library, recipe)
