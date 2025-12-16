@@ -24,19 +24,19 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            "chopsticks = robot_control.chopsticks:main",
+            "close_grip = robot_control.close_grip:main",
+            "executor = robot_control.executor:main",
+            "flatten2 = robot_control.flatten2:main",
             "go_home = robot_control.go_home:main",
             "open_grip = robot_control.open_grip:main",
-            "close_grip = robot_control.close_grip:main",
             "pick_spoid = robot_control.pick_spoid:main",
-            "pipetting = robot_control.pipetting:main",
             "pick_spoon = robot_control.pick_spoon:main",
-            "scooping = robot_control.scooping:main",
+            "pipetting = robot_control.pipetting:main",
             "scoop2 = robot_control.scoop2:main",
+            "scooping = robot_control.scooping:main",
             "spoon_flatten = robot_control.spoon_flatten:main",
-            "flatten2 = robot_control.flatten2:main",
-            "executor = robot_control.executor:main",
-            "executor_orig = robot_control.executor_orig:main",
-            "chopsticks = robot_control.chopsticks:main"
+            "test = robot_control.test:main"
         ],
     },
 )
