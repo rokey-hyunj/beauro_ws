@@ -401,9 +401,9 @@ def main(args=None):
         recipe = load_yaml(yaml_path_recipe)
 
         if library and recipe:
-            # execute_liquid(library, recipe)
-            # execute_powder(library, recipe)
-            # execute_sticks(library, recipe)
+            execute_liquid(library, recipe)
+            execute_powder(library, recipe)
+            execute_sticks(library, recipe)
             execute_tray(library)
             print("\n[SUCCESS] All recipes execution finished.")
         else:
