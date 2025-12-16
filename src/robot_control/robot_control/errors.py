@@ -372,7 +372,7 @@ class RobotErrorHandler:
     def _wait_user_decision(self) -> str:
         """사용자 결정 대기 (나중에 Web UI로 대체 가능)"""
         print("┌─────────────────────────────────┐")
-        print("│  계속 (c) / 중단 (s)?           │")
+        print("│  계속 (c) / 중단 (s)?             │")
         print("└─────────────────────────────────┘")
         while True:
             decision = input("선택: ").strip().lower()
