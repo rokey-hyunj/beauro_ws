@@ -65,18 +65,8 @@ def make_stir_pose(base_stir, p_tray_down, TRAY_BASE):
         base_stir[5],
     ])
 
-def flatten_and_shake(center_pose):
-    from DSR_ROBOT2 import movel, posx
-    x, y, z, rx, ry, rz = center_pose
-    shake_width = 5
-    movel(posx([x, y, z, rx, ry, rz]), vel=VEL_MOVE, acc=ACC)
-    for _ in range(5):
-        movel(posx([x+shake_width, y, z, rx, ry, rz]), vel=VEL_MOVE, acc=ACC)
-        movel(posx([x-shake_width, y, z, rx, ry, rz]), vel=VEL_MOVE, acc=ACC)
-    movel(posx([x, y, z, rx, ry, rz]), vel=VEL_MOVE, acc=ACC)
-
 def execute_sticks(library, recipe):
-    from DSR_ROBOT2 import posx, posj, movel, movej, DR_MV_RA_DUPLICATE
+    from DSR_ROBOT2 import posx, posj, movel, movej
 
     HOME_POSE = posj([0, 0, 90, 0, 90, 0])
     stick_poses = library["stick"]
