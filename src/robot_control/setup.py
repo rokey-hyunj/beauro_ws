@@ -11,6 +11,11 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
     ],
+    package_data={
+        package_name: [
+            '*.yaml',
+        ],
+    },
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='hyunjong',
@@ -24,8 +29,10 @@ setup(
     },
     entry_points={
         'console_scripts': [
+            "beauro = robot_control.beauro:main",
             "chopsticks = robot_control.chopsticks:main",
             "close_grip = robot_control.close_grip:main",
+            "errors = robot_control.errors:main",
             "executor = robot_control.executor:main",
             "flatten2 = robot_control.flatten2:main",
             "go_home = robot_control.go_home:main",
@@ -35,8 +42,7 @@ setup(
             "pipetting = robot_control.pipetting:main",
             "scoop2 = robot_control.scoop2:main",
             "scooping = robot_control.scooping:main",
-            "spoon_flatten = robot_control.spoon_flatten:main",
-            "test = robot_control.test:main"
+            "spoon_flatten = robot_control.spoon_flatten:main"
         ],
     },
 )
