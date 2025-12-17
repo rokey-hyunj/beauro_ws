@@ -21,7 +21,9 @@ ROBOT_TCP = "GripperDA_v1"
 # 속도 설정
 VEL_MOVE = 2000
 VEL_WORK = 500
+VEL_SPOON = 250
 ACC = 500
+ACC_SPOON = 200
 
 # 트레이 설정
 TRAY_PITCH_X = 57.0
@@ -185,19 +187,19 @@ class RobotErrorHandler:
 
     def _wait_for_web_decision(self, error_msg="Error Detected"):
         """
-        [수정됨] 콘솔 입력 대신 Firebase 명령을 대기함
+        웹에서의 명령(resume/stop)을 기다리는 함수
         """
         print(f"\n⏳ [WEB WAIT] {error_msg}")
         print("   Waiting for 'resume' or 'stop' from Web...")
 
-        # 1. Firebase에 에러 상태 알림
+        # 1. Firebase에 에러 상태 알림 (웹에 팝업 띄우기 위함)
         try:
             db.reference('robot_state').update({
-                'state': 3,  # Error/Paused
+                'state': 3,  # 3: Error/Paused
                 'error_message': error_msg,
                 'is_error': True
             })
-            # [수정] set(None) 대신 delete() 사용
+            # 기존 명령 클리어
             db.reference('command/recovery').delete()
         except: pass
 
@@ -207,39 +209,33 @@ class RobotErrorHandler:
                 cmd = db.reference('command/recovery').get()
                 
                 if cmd == 'resume':
-                    print("📩 Received: RESUME")
-                    
-                    # [수정] 명령 삭제는 delete() 사용
+                    print("📩 Received: RESUME -> Starting Recovery...")
                     db.reference('command/recovery').delete()
                     
-                    # [수정] None 대신 빈 문자열("") 사용
+                    # [중요] 복구 시도 중임을 알림 (에러 팝업은 유지하되 메시지 변경 가능)
                     db.reference('robot_state').update({
-                        'is_error': False, 
-                        'error_message': "", 
-                        'state': 2
+                        'error_message': "Attempting Auto-Recovery..."
                     })
                     return 'c' # Continue
                 
                 elif cmd == 'stop':
-                    print("📩 Received: STOP")
-                    # [수정] delete() 사용
+                    print("📩 Received: STOP -> Halting Task.")
                     db.reference('command/recovery').delete()
                     return 's' # Stop
                 
             except Exception as e:
-                # Polling 에러가 나도 죽지 않고 잠시 대기
                 print(f"Firebase Polling Warning: {e}")
             
             time.sleep(1.0) # 1초 간격 확인
         
-        return 's' # 강제 종료 시
+        return 's' # 강제 종료
 
     def check_and_recover(self):
         from DSR_ROBOT2 import get_robot_state, set_safe_stop_reset_type
         
         state = get_robot_state()
         
-        # 정상 상태면 패스
+        # 1. 정상 상태면 통과
         if state not in self.ERROR_STATES:
             if self.state_mgr.state["error_count"] > 0:
                 self.state_mgr.state["error_count"] = 0
@@ -250,25 +246,27 @@ class RobotErrorHandler:
         self.state_mgr.state["error_count"] += 1
         self.state_mgr.save()
         
-        # 에러 너무 많으면 중단 -> 웹에 결정 요청
-        if self.state_mgr.state["error_count"] > 5:
-            print("❌ Too many errors. Asking Web for decision.")
-            decision = self._wait_for_web_decision("Too many errors. Force Stop?")
-            if decision == 's': return False
-            self.state_mgr.state["error_count"] = 0 
-
-        # 비상정지(6)는 자동 복구 불가 -> 웹에 알림
+        # 2. [수정됨] 무조건 웹의 확인을 먼저 받음
+        # 에러 종류에 따른 메시지 생성
+        err_msg = f"Robot Error (Code {state}). Click RESUME to Auto-Recover."
         if state == 6:
-            decision = self._wait_for_web_decision("Emergency Stop! Release button and click Resume.")
-            if decision == 's': return False
-            # Resume을 눌렀다면, 버튼이 해제되었는지 확인 후 진행
-            if get_robot_state() == 6:
-                print("⚠️ Still in Emergency Stop. Please release button.")
-                return self.check_and_recover() # 재귀 호출로 다시 확인
-
-        # 자동 복구 시도
-        print("🔄 Attempting Auto-Recovery...")
+            err_msg = "Emergency Stop Detected. Release button -> Click RESUME."
+        
+        decision = self._wait_for_web_decision(err_msg)
+        
+        if decision == 's':
+            return False # 작업 중단
+            
+        # 3. 사용자가 'RESUME'을 눌렀을 때만 복구 시도
+        print("🔄 Executing Recovery Logic...")
         try:
+            # 비상정지(6) 상태에서 Resume을 눌렀다면, 버튼이 풀렸는지 먼저 확인
+            if state == 6:
+                if get_robot_state() == 6:
+                    print("⚠️ Still in Emergency Stop. Returning to wait.")
+                    return self.check_and_recover() # 다시 대기 상태로
+
+            # Safe Stop 등 자동 복구 시도
             set_safe_stop_reset_type(2)
             self._call_service(3) # Reset
             time.sleep(1)
@@ -277,25 +275,25 @@ class RobotErrorHandler:
             self._call_service(1) # Servo On
             time.sleep(3)
             
-            # 복구 확인
+            # 4. 복구 결과 확인
             if get_robot_state() not in self.ERROR_STATES:
                 print("✅ Recovery Successful.")
-                # [수정] 성공 시 에러 메시지 초기화 (None -> "")
-                db.reference('robot_state').update({'is_error': False, 'error_message': ""})
+                # 웹 에러 상태 해제
+                db.reference('robot_state').update({
+                    'is_error': False, 
+                    'error_message': "",
+                    'state': 2 # Working
+                })
                 return True
             else:
-                # 자동 복구 실패 시 웹에 도움 요청
-                print("⚠️ Auto-Recovery Failed.")
-                decision = self._wait_for_web_decision("Auto-recovery failed. Manual check required.")
-                
-                if decision == 's': return False
-                if decision == 'c': return self.check_and_recover() # 다시 시도
+                print("⚠️ Recovery Failed. Asking again.")
+                # 재귀 호출하여 다시 웹의 결정을 기다림 (사용자가 Stop 누를 때까지 반복 가능)
+                return self.check_and_recover()
 
         except Exception as e:
             print(f"Recovery Error: {e}")
-            
-        return False
-
+            return self.check_and_recover() # 에러 시 다시 대기
+        
 # ==========================================
 # 3. 유틸리티 함수
 # ==========================================
@@ -398,7 +396,7 @@ def execute_liquid(library, recipe, current_step, total_steps, order_id, state_m
         state_mgr.update(order_id, "liquid", None, None, step, liquid_key)
         if not err_handler.check_and_recover(): return current_step
         
-        movej(posj([0, 0, 90, 0, 90, 0]), vel=VEL_MOVE, acc=ACC)
+        movej(posj([0, 0, 90, 0, 90, 0]), time=2)
         gripper_control("init")
 
     # === STEP: PICK ===
@@ -562,14 +560,14 @@ def execute_powder(library, recipe, current_step, total_steps, order_id, state_m
                 
                 # [수정] 3단계 평탄화
                 for p_flat in p_flat_list:
-                    movel(p_flat, vel=VEL_MOVE, acc=ACC)
+                    movel(p_flat, VEL_SPOON, acc=ACC_SPOON)
 
                 # === STEP: POUR MOVE ===
                 step = TaskStep.POWDER_POUR_MOVE
                 state_mgr.update(order_id, "powder", tray_idx, c, step, powder_key)
                 if not err_handler.check_and_recover(): return current_step
                 
-                movel(p_tray, vel=VEL_MOVE, acc=ACC)
+                movel(p_tray, vel=VEL_WORK, acc=ACC)
 
                 # === STEP: POUR ACTION ===
                 step = TaskStep.POWDER_POUR
@@ -579,14 +577,20 @@ def execute_powder(library, recipe, current_step, total_steps, order_id, state_m
                 # [수정] 현재 위치 기반 상대 회전
                 cur_j = list(get_current_posj())
                 cur_j[5] += POUR_ANGLE # J6 회전
-                movej(posj(cur_j), vel=VEL_WORK, acc=ACC)
+                movej(posj(cur_j), time=2)
+
+                # # 미숫가루 전용 트레이 치는 모션
+                # (x, y, z, rx, ry, rz), _ = get_current_posx()
+                # for _ in range(2):
+                #     movel(posx([x, y, z - 40, rx, ry, rz]), vel=VEL_MOVE, acc=ACC)
+                #     movel(posx([x, y, z, rx, ry, rz]), vel=VEL_MOVE, acc=ACC)
                 
                 # [수정] 털기 동작
                 for _ in range(3):
                     cur_j[5] += 10.0
-                    movej(posj(cur_j), vel=VEL_WORK, acc=ACC)
+                    movej(posj(cur_j), time=0.5)
                     cur_j[5] -= 20.0 # +10에서 -10으로 가려면 -20 필요
-                    movej(posj(cur_j), vel=VEL_WORK, acc=ACC)
+                    movej(posj(cur_j), time=0.5)
                     cur_j[5] += 10.0 # 원복
                 
                 # 복귀 (트레이 위로 다시 정렬)
@@ -615,8 +619,6 @@ def execute_powder(library, recipe, current_step, total_steps, order_id, state_m
             curr_x_list = list(get_current_posx()[0])
             curr_x_list[2] += 200
             movel(posx(curr_x_list), vel=VEL_WORK, acc=ACC)
-            
-            movej(posj([0, 0, 90, 0, 90, 0]), vel=VEL_MOVE, acc=ACC)
     
     except Exception as e:
         print(f"\n❌ Powder 작업 중 오류: {e}")
@@ -655,7 +657,7 @@ def execute_sticks(library, recipe, current_step, total_steps, order_id, state_m
     TRAY_UP_Z, TRAY_DOWN_Z = 550, 427
     trays = recipe["trays"]
 
-    movej(HOME_POSE, vel=VEL_MOVE, acc=ACC)
+    movej(HOME_POSE, time=2)
 
     for t_idx in trays:
         tray_idx = int(t_idx)
@@ -714,7 +716,7 @@ def execute_sticks(library, recipe, current_step, total_steps, order_id, state_m
         # 잠시 대기 (스틱이 떨어질 시간)
         time.sleep(0.5)
 
-    movej(HOME_POSE, vel=VEL_MOVE, acc=ACC)
+    movej(HOME_POSE, time=2)
     return current_step
 
 def execute_tray(library, order_id, state_mgr, err_handler):
@@ -748,7 +750,7 @@ def execute_tray(library, order_id, state_mgr, err_handler):
 
     movel(FINISH, vel=VEL_MOVE, acc=ACC)
     movel(posx(FINISH[0:2] + [FINISH[2] + 80] + FINISH[3:6]), vel=VEL_MOVE, acc=ACC)
-    movej(HOME_POSE, vel=VEL_MOVE, acc=ACC)
+    movej(HOME_POSE, time=2)
 
 # ==========================================
 # 5. 재료별 레시피 생성 헬퍼
@@ -842,7 +844,7 @@ def main(args=None):
                 for well in doe_matrix:
                     counts = well.get('counts', {})
                     total_ops += sum(counts.values()) + 1
-                total_steps = total_ops
+                total_steps = total_ops - 5
                 current_step = 0
 
                 # 1. Phase 1: Dispensing
