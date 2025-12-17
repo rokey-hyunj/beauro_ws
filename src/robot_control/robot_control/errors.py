@@ -594,7 +594,7 @@ def execute_liquid(library, recipe, state_mgr, error_handler):
 # 5. 분말 작업 (에러 핸들링 추가)
 # ==========================================
 def execute_powder(library, recipe, state_mgr, error_handler):
-    from DSR_ROBOT2 import posx, posj, movel, movej
+    from DSR_ROBOT2 import posx, posj, movel, movej, get_current_posx, get_current_posj
 
     print("\n[Start] Powder Process")
 
@@ -605,115 +605,127 @@ def execute_powder(library, recipe, state_mgr, error_handler):
     xg, yg, zg, rxg, ryg, rzg = p_grab
 
     p_bowl = posx(pow_data["bowl"]["posx"])
-    p_scoop_1 = posj(pow_data["scoop_1"]["posj"])
-    p_scoop_2 = posj(pow_data["scoop_2"]["posj"])
-    p_scoop_3 = posj(pow_data["scoop_3"]["posj"])
-    p_flat = posx(pow_data["flat"]["posx"])
+    
+    # scoop_1은 posx로 변경됨
+    p_scoop_1 = posx(pow_data["scoop"]["posx"])
+    
+    # flat은 3개의 좌표 리스트
+    p_flat_list = [posx(p) for p in pow_data["flat"]["posx"]]
     
     p_tray_base = pow_data["tray_base"]["posx"]
-    p_pour_list = pow_data["pour"]["posj"]
 
     spoon_shift = -40 if powder_key == "powder_A" else 40
-    POUR_ANGLE = -90 if powder_key == "powder_A" else 90
+    POUR_ANGLE = -130 if powder_key == "powder_A" else 130
+    
+    # 스쿠핑 깊이 (y방향으로 밀기)
+    SCOOP_Y_PUSH = 68.92  # mm
 
-    # === 스텝: 스푼 집기 ===
-    step = TaskStep.POWDER_GRAB
-    if not state_mgr.should_skip("powder", None, None, step):
-        print(f"🔄 {step.value} - Picking {powder_key}")
-        state_mgr.update("powder", None, None, step, powder_key)
-        if not error_handler.check_and_recover(): return False
+    try:
+        # === 스텝: 스푼 집기 ===
+        step = TaskStep.POWDER_GRAB
+        if not state_mgr.should_skip("powder", None, None, step):
+            print(f"🔄 {step.value} - Picking {powder_key}")
+            state_mgr.update("powder", None, None, step, powder_key)
+            
+            gripper_control("init")
+            movel(posx([xg, yg, zg+80, rxg, ryg, rzg]), vel=VEL_MOVE, acc=ACC)
+            movel(p_grab, vel=VEL_WORK, acc=ACC)
+            gripper_control("squeeze")
+            movel(posx([xg + spoon_shift, yg, zg, rxg, ryg, rzg]), vel=VEL_MOVE, acc=ACC)
+            movel(posx([xg + spoon_shift, yg, zg+110, rxg, ryg, rzg]), vel=VEL_MOVE, acc=ACC)
+
+        trays = recipe["trays"]
+        for t_idx, t_cfg in trays.items():
+            count = t_cfg["count"]["powder"]
+            if count <= 0: continue
+            
+            tray_idx = int(t_idx)
+            print(f">> Processing Tray #{tray_idx} (Count: {count})")
+
+            p_tray = get_tray_pose(p_tray_base, tray_idx)
+            # p_pour = posj(p_pour_list[tray_idx - 1])
+
+            for c in range(count):
+                # === 스텝: 스쿠핑 이동 ===
+                step = TaskStep.POWDER_SCOOP_MOVE
+                if state_mgr.should_skip("powder", tray_idx, c, step):
+                    print(f"  ⏭️ 스킵: 트레이 {tray_idx}, 반복 {c+1}/{count}")
+                    continue
+                
+                print(f"  🔄 Loop {c+1}: {step.value}")
+                state_mgr.update("powder", tray_idx, c, step, powder_key)
+                
+                movel(p_bowl, vel=VEL_MOVE, acc=ACC)
+                movel(p_scoop_1, vel=VEL_WORK, acc=ACC)
+
+                # === 스텝: 스쿠핑 (y방향으로 밀기) ===
+                step = TaskStep.POWDER_SCOOP
+                print(f"     ↳ {step.value}")
+                state_mgr.update("powder", tray_idx, c, step, powder_key)
+                
+                # p_scoop_1에서 y값을 SCOOP_Y_PUSH만큼 증가
+                xs1, ys1, zs1, rxs1, rys1, rzs1 = p_scoop_1
+                p_scoop_2 = posx([xs1, ys1 + SCOOP_Y_PUSH, zs1, rxs1, rys1, rzs1])
+                movel(p_scoop_2, vel=VEL_WORK, acc=ACC)
+
+                # === 스텝: 평탄화 (3개 좌표 순차 이동) ===
+                step = TaskStep.POWDER_FLATTEN
+                print(f"     ↳ {step.value}")
+                state_mgr.update("powder", tray_idx, c, step, powder_key)
+                if not error_handler.check_and_recover(): return False
+                
+                for i, p_flat in enumerate(p_flat_list):
+                    print(f"        → 평탄화 {i+1}/3")
+                    movel(p_flat, vel=VEL_MOVE, acc=ACC)
+
+                # === 스텝: 붓기 위치 이동 ===
+                step = TaskStep.POWDER_POUR_MOVE
+                print(f"     ↳ {step.value}")
+                state_mgr.update("powder", tray_idx, c, step, powder_key)
+                if not error_handler.check_and_recover(): return False
+                
+                movel(p_tray, vel=VEL_MOVE, acc=ACC)
+
+                # === 스텝: 붓기 ===
+                step = TaskStep.POWDER_POUR
+                print(f"     ↳ {step.value}")
+                state_mgr.update("powder", tray_idx, c, step, powder_key)
+                if not error_handler.check_and_recover(): return False
+                
+                j1, j2, j3, j4, j5, j6 = get_current_posj()
+                movej(posj([j1, j2, j3, j4, j5, j6+POUR_ANGLE]), vel=VEL_WORK, acc=ACC)
+                
+                # === 스텝: 털기 ===
+                for _ in range(3):
+                    movej(posj([j1, j2, j3, j4, j5, j6+POUR_ANGLE + 10.0]), vel=VEL_WORK, acc=ACC)
+                    movej(posj([j1, j2, j3, j4, j5, j6+POUR_ANGLE - 10.0]), vel=VEL_WORK, acc=ACC)
+                
+                movel(p_tray, vel=VEL_MOVE, acc=ACC)
+                print(f"     ✅ 반복 {c+1} 완료")
+
+        # === 스텝: 스푼 정리 ===
+        step = TaskStep.POWDER_RETURN
+        if not state_mgr.should_skip("powder", None, None, step):
+            print(f"🔄 {step.value}")
+            state_mgr.update("powder", None, None, step, powder_key)
+            if not error_handler.check_and_recover(): return False
+            
+            (x, y, z, rx, ry, rz), _ = get_current_posx()
+            movel(posx([x, y, z + 150, rx, ry, rz]), vel=VEL_MOVE, acc=ACC) # 트레이에서 위로
+            movel(posx([xg + spoon_shift, yg, 500, rxg, ryg, rzg]), vel=VEL_MOVE, acc=ACC)
+            movel(posx([xg + spoon_shift, yg, zg, rxg, ryg, rzg]), vel=VEL_MOVE, acc=ACC)
+            movel(p_grab, vel=VEL_WORK, acc=ACC)
+            gripper_control("init")
+            (x, y, z, rx, ry, rz), _ = get_current_posx()
+            movel(posx([x, y, z + 200, rx, ry, rz]), vel=VEL_WORK, acc=ACC)
+            movej(posj([0, 0, 90, 0, 90, 0]), vel=VEL_MOVE, acc=ACC)
+
+        print("✅ Powder Process Complete")
+        return True
         
-        gripper_control("init")
-        movel(posx([xg, yg, zg+80, rxg, ryg, rzg]), vel=VEL_MOVE, acc=ACC)
-        movel(p_grab, vel=VEL_WORK, acc=ACC)
-        gripper_control("squeeze")
-        movel(posx([xg + spoon_shift, yg, zg, rxg, ryg, rzg]), vel=VEL_MOVE, acc=ACC)
-        movel(posx([xg + spoon_shift, yg, zg+110, rxg, ryg, rzg]), vel=VEL_MOVE, acc=ACC)
-
-    trays = recipe["trays"]
-    for t_idx, t_cfg in trays.items():
-        count = t_cfg["count"]["powder"]
-        if count <= 0: continue
-        
-        tray_idx = int(t_idx)
-        print(f">> Processing Tray #{tray_idx} (Count: {count})")
-
-        p_tray = get_tray_pose(p_tray_base, tray_idx)
-        p_pour = posj(p_pour_list[tray_idx - 1])
-
-        for c in range(count):
-            # === 스텝: 스쿠핑 이동 ===
-            step = TaskStep.POWDER_SCOOP_MOVE
-            if state_mgr.should_skip("powder", tray_idx, c, step):
-                print(f"  ⏭️ 스킵: 트레이 {tray_idx}, 반복 {c+1}/{count}")
-                continue
-            
-            print(f"  🔄 Loop {c+1}: {step.value}")
-            state_mgr.update("powder", tray_idx, c, step, powder_key)
-            if not error_handler.check_and_recover(): return False
-            
-            movel(p_bowl, vel=VEL_MOVE, acc=ACC)
-            movej(p_scoop_1, vel=VEL_WORK, acc=ACC)
-
-            # === 스텝: 스쿠핑 ===
-            step = TaskStep.POWDER_SCOOP
-            print(f"     ↳ {step.value}")
-            state_mgr.update("powder", tray_idx, c, step, powder_key)
-            if not error_handler.check_and_recover(): return False
-            
-            movej(p_scoop_2, vel=VEL_WORK, acc=ACC)
-            movej(p_scoop_3, vel=VEL_WORK, acc=ACC)
-
-            # === 스텝: 평탄화 ===
-            step = TaskStep.POWDER_FLATTEN
-            print(f"     ↳ {step.value}")
-            state_mgr.update("powder", tray_idx, c, step, powder_key)
-            if not error_handler.check_and_recover(): return False
-            
-            movel(p_flat, vel=VEL_MOVE, acc=ACC)
-            flatten_and_shake(p_flat)
-
-            # === 스텝: 붓기 위치 이동 ===
-            step = TaskStep.POWDER_POUR_MOVE
-            print(f"     ↳ {step.value}")
-            state_mgr.update("powder", tray_idx, c, step, powder_key)
-            if not error_handler.check_and_recover(): return False
-            
-            movel(p_tray, vel=VEL_MOVE, acc=ACC)
-            movej(p_pour, vel=VEL_MOVE, acc=ACC)
-
-            # === 스텝: 붓기 ===
-            step = TaskStep.POWDER_POUR
-            print(f"     ↳ {step.value}")
-            state_mgr.update("powder", tray_idx, c, step, powder_key)
-            if not error_handler.check_and_recover(): return False
-            
-            j1, j2, j3, j4, j5, j6 = p_pour
-            p_pour_j = posj([j1, j2, j3, j4, j5, j6+POUR_ANGLE])
-            movej(p_pour_j, vel=VEL_WORK, acc=ACC)
-            
-            for _ in range(3):
-                movej(posj([j1, j2, j3, j4, j5, j6+POUR_ANGLE + 5.0]), vel=VEL_WORK, acc=ACC)
-                movej(posj([j1, j2, j3, j4, j5, j6+POUR_ANGLE - 5.0]), vel=VEL_WORK, acc=ACC)
-            
-            movel(p_tray, vel=VEL_MOVE, acc=ACC)
-            print(f"     ✅ 반복 {c+1} 완료")
-
-    # === 스텝: 스푼 정리 ===
-    step = TaskStep.POWDER_RETURN
-    if not state_mgr.should_skip("powder", None, None, step):
-        print(f"🔄 {step.value}")
-        state_mgr.update("powder", None, None, step, powder_key)
-        if not error_handler.check_and_recover(): return False
-        
-        movel(posx([xg + spoon_shift, yg, zg+80, rxg, ryg, rzg]), vel=VEL_MOVE, acc=ACC)
-        movel(posx([xg + spoon_shift, yg, zg, rxg, ryg, rzg]), vel=VEL_MOVE, acc=ACC)
-        movel(p_grab, vel=VEL_WORK, acc=ACC)
-        gripper_control("init")
-        movej(posj([0, 0, 90, 0, 90, 0]), vel=VEL_MOVE, acc=ACC)
-
-    print("✅ Powder Process Complete")
-    return True
+    except RuntimeError as e:
+        print(f"\n❌ Powder 작업 중단: {e}")
+        return False
 
 # ==========================================
 # 6. 스틱 작업 (에러 핸들링 추가)
@@ -784,9 +796,9 @@ def execute_sticks(library, recipe, state_mgr, error_handler):
         for _ in range(3):
             for i, p in enumerate(stir_poses_tray):
                 if i == len(stir_poses_tray) - 1:
-                    movel(p, vel=VEL_WORK, acc=ACC, radius=0)
+                    movel(p, vel=VEL_MOVE, acc=ACC, radius=0)
                 else:
-                    movel(p, vel=VEL_WORK, acc=ACC, radius=10)
+                    movel(p, vel=VEL_MOVE, acc=ACC, radius=10)
 
         movel(p_tray_up, vel=VEL_MOVE, acc=ACC)
 
@@ -797,10 +809,6 @@ def execute_sticks(library, recipe, state_mgr, error_handler):
         if not error_handler.check_and_recover(): return False
 
         movel(DROP, vel=VEL_MOVE, acc=ACC)
-        movel(posx([
-            DROP[0], DROP[1], DROP[2] - 158,
-            DROP[3], DROP[4], DROP[5]
-        ]), vel=VEL_WORK, acc=ACC)
 
         gripper_control("init")
         movel(DROP, vel=VEL_MOVE, acc=ACC)
@@ -840,7 +848,7 @@ def execute_tray(library, state_mgr, error_handler):
         movel(READY_2, vel=VEL_MOVE, acc=ACC)
         movel(GRAB, vel=VEL_MOVE, acc=ACC)
         gripper_control("hold")
-        movel(posx(GRAB[0:2] + [GRAB[2] + 100] + GRAB[3:6]), vel=VEL_MOVE, acc=ACC)
+        movel(posx(GRAB[0:2] + [GRAB[2] + 200] + GRAB[3:6]), vel=VEL_MOVE, acc=ACC)
 
     # === 스텝: 트레이 배출 ===
     step = TaskStep.TRAY_DROP

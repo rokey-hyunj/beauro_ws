@@ -13,27 +13,27 @@ trays:
       liquid: 2
       powder: 1
 
-  2:
-    count:
-      liquid: 1
-      powder: 2
+  # 2:
+  #   count:
+  #     liquid: 1
+  #     powder: 2
 
-  3:
-    count:
-      liquid: 1
-      powder: 1
+  # 3:
+  #   count:
+  #     liquid: 1
+  #     powder: 1
 
-  4:
-    count:
-      liquid: 1
-      powder: 1
+  # 4:
+  #   count:
+  #     liquid: 1
+  #     powder: 1
 
-  5:
-    count:
-      liquid: 1
-      powder: 1
+  # 5:
+  #   count:
+  #     liquid: 1
+  #     powder: 1
 
-  6:
-    count:
-      liquid: 1
-      powder: 1
+  # 6:
+  #   count:
+  #     liquid: 1
+  #     powder: 1
