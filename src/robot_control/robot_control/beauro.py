@@ -499,7 +499,7 @@ def execute_powder(library, recipe, current_step, total_steps, order_id, state_m
 
     # 상수 설정
     spoon_shift = -40 if powder_key == "powder_A" else 40
-    POUR_ANGLE = -130 if powder_key == "powder_A" else 130
+    POUR_ANGLE = -175 if powder_key == "powder_A" else 175
     SCOOP_Y_PUSH = 68.92
 
     progress = (current_step / total_steps) * 100
@@ -581,7 +581,13 @@ def execute_powder(library, recipe, current_step, total_steps, order_id, state_m
                 # [수정] 현재 위치 기반 상대 회전
                 cur_j = list(get_current_posj())
                 cur_j[5] += POUR_ANGLE # J6 회전
-                movej(posj(cur_j), vel=VEL_MOVE, acc=ACC)
+                movej(posj(cur_j), vel=VEL_MOVE, acc=ACC_SPOON)
+
+                # 미숫가루 전용 트레이 치는 모션
+                (x, y, z, rx, ry, rz), _ = get_current_posx()
+                for _ in range(2):
+                    movel(posx([x, y, z, rx, ry, rz - 20]), vel=VEL_SPOON, acc=ACC_SPOON)
+                    movel(posx([x, y, z, rx, ry, rz]), vel=VEL_SPOON, acc=ACC_SPOON)
                 
                 # [수정] 털기 동작
                 for _ in range(3):
