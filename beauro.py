@@ -439,6 +439,8 @@ def execute_liquid(library, recipe, current_step, total_steps, order_id, state_m
             gripper_control("hold")
             movel(p_cup_up, vel=VEL_MOVE, acc=ACC)
 
+            time.sleep(1.5) # 흡입 이후 액체 떨어지는거 약간 대기
+
             # === STEP: DISPENSE ===
             step = TaskStep.LIQUID_DISPENSE
             state_mgr.update(order_id, "liquid", tray_idx, c, step, liquid_key)
@@ -513,7 +515,7 @@ def execute_powder(library, recipe, current_step, total_steps, order_id, state_m
             movel(p_grab, vel=VEL_WORK, acc=ACC)
             gripper_control("squeeze")
             movel(posx([xg + spoon_shift, yg, zg, rxg, ryg, rzg]), vel=VEL_MOVE, acc=ACC)
-            movel(posx([xg + spoon_shift, yg, zg+110, rxg, ryg, rzg]), vel=VEL_MOVE, acc=ACC)
+            movel(posx([xg + spoon_shift, yg, zg+200, rxg, ryg, rzg]), vel=VEL_MOVE, acc=ACC)
 
         trays = recipe["trays"]
         for t_idx, t_cfg in trays.items():
@@ -567,7 +569,13 @@ def execute_powder(library, recipe, current_step, total_steps, order_id, state_m
                 state_mgr.update(order_id, "powder", tray_idx, c, step, powder_key)
                 if not err_handler.check_and_recover(): return current_step
                 
-                movel(p_tray, vel=VEL_WORK, acc=ACC)
+                x, y, z, rx ,ry, rz = p_tray
+                if powder_key == "powder_B" and tray_idx == 1:
+                    movel(posx([x, y, z+200, rx, ry, rz]), vel=VEL_MOVE, acc=ACC)
+                    movel(posx([x, y, z+10, rx, ry, rz]), vel=VEL_MOVE, acc=ACC)
+                else:
+                    movel(posx([x, y, z+200, rx, ry, rz]), vel=VEL_MOVE, acc=ACC)
+                    movel(p_tray, vel=VEL_MOVE, acc=ACC)
 
                 # === STEP: POUR ACTION ===
                 step = TaskStep.POWDER_POUR
@@ -578,12 +586,6 @@ def execute_powder(library, recipe, current_step, total_steps, order_id, state_m
                 cur_j = list(get_current_posj())
                 cur_j[5] += POUR_ANGLE # J6 회전
                 movej(posj(cur_j), time=2)
-
-                # # 미숫가루 전용 트레이 치는 모션
-                # (x, y, z, rx, ry, rz), _ = get_current_posx()
-                # for _ in range(2):
-                #     movel(posx([x, y, z - 40, rx, ry, rz]), vel=VEL_MOVE, acc=ACC)
-                #     movel(posx([x, y, z, rx, ry, rz]), vel=VEL_MOVE, acc=ACC)
                 
                 # [수정] 털기 동작
                 for _ in range(3):
@@ -594,7 +596,8 @@ def execute_powder(library, recipe, current_step, total_steps, order_id, state_m
                     cur_j[5] += 10.0 # 원복
                 
                 # 복귀 (트레이 위로 다시 정렬)
-                movel(p_tray, vel=VEL_MOVE, acc=ACC)
+                x, y, z, rx, ry, rz = p_tray
+                movel(posx([x, y , z+50, rx, ry, rz]), vel=VEL_MOVE, acc=ACC)
 
         # === STEP: RETURN ===
         step = TaskStep.POWDER_RETURN
@@ -617,7 +620,7 @@ def execute_powder(library, recipe, current_step, total_steps, order_id, state_m
             
             # 놓고 빠지기
             curr_x_list = list(get_current_posx()[0])
-            curr_x_list[2] += 200
+            curr_x_list[2] += 250
             movel(posx(curr_x_list), vel=VEL_WORK, acc=ACC)
     
     except Exception as e:
