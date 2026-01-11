@@ -235,8 +235,8 @@ source install/setup.bash
 
 ```bash
 # 프로젝트 클론
-git clone https://github.com/your-organization/beauro.git
-cd beauro
+git clone https://github.com/rokey-hyunj/beauro_ws.git
+cd beauro_ws
 
 # Python 의존성 설치
 pip install -r requirements.txt
@@ -337,7 +337,7 @@ ping 192.168.137.100
 
 ```bash
 # 프로젝트 디렉토리로 이동
-cd beauro
+cd beauro_ws
 
 # 메인 스크립트 실행
 python3 beauro.py
