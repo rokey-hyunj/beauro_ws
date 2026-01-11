@@ -1,0 +1,348 @@
+# ==========================================
+# BeauRo Robot Configuration File
+# ==========================================
+# 이 파일은 BeauRo 시스템의 로봇 설정을 관리합니다.
+# 주의: 값 변경 시 로봇 동작에 영향을 줄 수 있으므로 신중하게 수정하세요.
+#
+# 마지막 업데이트: 2025-12-19
+# 작성자: BeauRo Team
+# ==========================================
+
+# ------------------------------------------
+# 1. 로봇 기본 정보
+# ------------------------------------------
+robot:
+  id: "dsr01"                    # 로봇 식별자 (ROS2 namespace)
+  model: "m0609"                  # 로봇 모델명 (m0609, m1013 등)
+  serial_number: "DSR-M0609-001"  # 시리얼 번호 (선택사항)
+  
+  # 로봇 제어기 네트워크 설정
+  controller:
+    ip: "192.168.137.100"         # 로봇 제어기 IP 주소
+    port: 12345                   # 통신 포트 (기본값)
+    timeout: 5.0                  # 연결 타임아웃 (초)
+
+# ------------------------------------------
+# 2. TCP (Tool Center Point) 설정
+# ------------------------------------------
+tcp:
+  # 현재 사용 중인 TCP
+  active: "GripperDA_v1"
+  
+  # TCP 목록 정의
+  # 형식: [x, y, z, rx, ry, rz] (mm, degree)
+  definitions:
+    GripperDA_v1:
+      name: "피펫/스푼/스틱 통합 그리퍼 v1"
+      offset: [0, 0, 150, 0, 0, 0]    # 플랜지 기준 오프셋
+      weight: 0.5                      # 그리퍼 무게 (kg)
+      com: [0, 0, 75]                  # 질량 중심 (mm)
+      inertia: [1, 0, 0, 0, 1, 0, 0, 0, 1]  # 관성 텐서
+    
+    GripperDA_v2:
+      name: "스푼 전용 그리퍼 v2"
+      offset: [0, 0, 160, 0, 0, 0]
+      weight: 0.6
+      com: [0, 0, 80]
+      inertia: [1, 0, 0, 0, 1, 0, 0, 0, 1]
+
+# ------------------------------------------
+# 3. 속도 및 가속도 프로파일
+# ------------------------------------------
+motion:
+  # 기본 이동 속도 (mm/s)
+  velocity:
+    move: 2000        # 빠른 이동 (재료 간 이동 등)
+    work: 500         # 작업 속도 (분주, 교반)
+    spoon: 250        # 스푼 작업 (분말, 정밀)
+    approach: 300     # 접근 속도 (파지 직전)
+    retreat: 800      # 후퇴 속도 (작업 완료 후)
+  
+  # 가속도 (mm/s²)
+  acceleration:
+    normal: 500       # 일반 가속도
+    spoon: 200        # 스푼 작업 (부드러운 가속)
+    rapid: 800        # 빠른 이동 시
+  
+  # 블렌딩 반경 (mm)
+  # 경로점을 부드럽게 연결
+  blending:
+    default: 10       # 기본 블렌딩 반경
+    precise: 0        # 정확한 위치 필요 시
+    smooth: 20        # 부드러운 이동 필요 시
+
+# ------------------------------------------
+# 4. 작업별 세부 설정
+# ------------------------------------------
+operations:
+  # 액상 분주 (Liquid Dispensing)
+  liquid:
+    pipette_dip_depth: 10         # 피펫 담금 깊이 (mm)
+    suction_time: 1.2             # 흡입 대기 시간 (초)
+    dispense_time: 0.8            # 분주 대기 시간 (초)
+    drip_prevention_height: 20    # 액체 방울 방지 높이 (mm)
+    approach_offset: 30           # 용기 접근 시 여유 높이 (mm)
+  
+  # 분말 투입 (Powder Scooping)
+  powder:
+    scoop_depth: 15               # 스쿱 깊이 (mm)
+    scoop_speed: 200              # 스쿱 속도 (mm/s)
+    flatten_pressure: 50          # 레벨링 압력 (N, 선택사항)
+    pour_angle: 45                # 붓기 각도 (degree)
+    pour_duration: 1.5            # 붓기 대기 시간 (초)
+    shake_count: 2                # 털기 반복 횟수
+  
+  # 교반 (Stirring)
+  stirring:
+    repetitions: 3                # 교반 패턴 반복 횟수
+    speed: 500                    # 교반 속도 (mm/s)
+    radius: 10                    # 교반 반경 (mm)
+    depth_offset: -20             # 웰 상단 대비 스틱 깊이 (mm)
+    # 교반 패턴 (웰 중심 기준 상대 좌표)
+    pattern:
+      - [0, 0, 0]      # 중앙
+      - [10, 0, 0]     # 우측
+      - [0, 10, 0]     # 상단
+      - [-10, 0, 0]    # 좌측
+      - [0, -10, 0]    # 하단
+      - [0, 0, 0]      # 중앙 복귀
+  
+  # 트레이 이송 (Tray Transfer)
+  tray:
+    grip_force: 30                # 파지 힘 (%, 선택사항)
+    lift_height: 100              # 들어올림 높이 (mm)
+    transfer_speed: 1500          # 이송 속도 (mm/s)
+    place_offset: 5               # 내려놓기 오프셋 (mm)
+
+# ------------------------------------------
+# 5. 안전 설정
+# ------------------------------------------
+safety:
+  # 작업 공간 제한 (mm)
+  workspace:
+    x_min: -800
+    x_max: 800
+    y_min: -800
+    y_max: 800
+    z_min: 0          # 테이블 높이
+    z_max: 1000       # 최대 높이
+  
+  # 안전 속도 제한
+  max_velocity: 3000              # 최대 속도 (mm/s)
+  max_acceleration: 1000          # 최대 가속도 (mm/s²)
+  
+  # 충돌 감지 민감도 (0.0 ~ 1.0)
+  collision_sensitivity: 0.8
+  
+  # 비상 정지 후 복구 설정
+  emergency_recovery:
+    auto_servo_on: true           # 자동 Servo-On 시도
+    retry_count: 3                # 재시도 횟수
+    retry_delay: 2.0              # 재시도 간격 (초)
+
+# ------------------------------------------
+# 6. 트레이 좌표 설정
+# ------------------------------------------
+tray:
+  # 트레이 타입
+  type: "custom_24well"           # 24-well, 96-well, custom_24well
+  
+  # 베이스 좌표 (A1 웰 위치)
+  base_position: [100.0, 450.0, 280.0, 0.0, 180.0, 0.0]
+  
+  # 웰 간격 (mm)
+  pitch:
+    x: 57.0           # 행 간격 (A→B 방향)
+    y: 38.0           # 열 간격 (1→2 방향)
+  
+  # 트레이 레이아웃
+  layout:
+    rows: 4           # 행 개수 (A, B, C, D)
+    columns: 6        # 열 개수 (1, 2, 3, 4, 5, 6)
+  
+  # 웰 깊이 정보
+  well:
+    depth: 30         # 웰 깊이 (mm)
+    diameter: 15      # 웰 직경 (mm)
+    working_volume: 5 # 작업 부피 (ml)
+
+# ------------------------------------------
+# 7. 그리퍼 제어 설정
+# ------------------------------------------
+gripper:
+  # 디지털 출력 매핑 (DO 번호)
+  digital_output:
+    init: [1, 0, 0, 0, 0, 0]      # 초기화 (열림)
+    hold: [0, 1, 0, 0, 0, 0]      # 파지 (닫힘)
+    flatten: [0, 0, 1, 0, 0, 0]   # 레벨링 (스푼용)
+    release: [0, 0, 0, 1, 0, 0]   # 해제
+  
+  # 그리퍼 동작 타이밍
+  timing:
+    open_delay: 0.3               # 열림 대기 시간 (초)
+    close_delay: 0.5              # 닫힘 대기 시간 (초)
+    settle_time: 0.2              # 안정화 시간 (초)
+  
+  # 공압 설정
+  pneumatic:
+    pressure: 0.55                # 작동 압력 (MPa)
+    min_pressure: 0.4             # 최소 압력 (MPa)
+    max_pressure: 0.7             # 최대 압력 (MPa)
+
+# ------------------------------------------
+# 8. Firebase 설정
+# ------------------------------------------
+firebase:
+  # 데이터베이스 URL
+  database_url: "https://beauro-xxxxx.firebaseio.com/"
+  # 또는: "https://beauro-xxxxx.asia-southeast1.firebasedatabase.app/"
+  
+  # 서비스 계정 키 파일 경로
+  credentials_path: "./serviceAccountKey.json"
+  
+  # 데이터 경로
+  paths:
+    current_order: "current_order"
+    robot_state: "robot_state"
+    task_checkpoint: "task_checkpoint"
+    command: "command"
+  
+  # 업데이트 주기
+  update_interval:
+    robot_state: 0.5              # 로봇 상태 업데이트 간격 (초)
+    progress: 1.0                 # 진행률 업데이트 간격 (초)
+  
+  # 타임아웃 설정
+  timeout:
+    connection: 10.0              # 연결 타임아웃 (초)
+    operation: 5.0                # 작업 타임아웃 (초)
+
+# ------------------------------------------
+# 9. 에러 복구 설정
+# ------------------------------------------
+error_recovery:
+  # 자동 복구 활성화
+  enabled: true
+  
+  # 감지할 에러 상태 코드
+  monitored_states: [3, 5, 6, 9, 10]
+  # 3: Safe Stop
+  # 5: E-Stop
+  # 6: Protective Stop
+  # 9: Servo-Off
+  # 10: Power Off
+  
+  # 복구 전략
+  strategies:
+    safe_stop:                    # Safe Stop (상태 3, 6)
+      reset_type: 0               # SAFE_STOP_RESET_TYPE_DEFAULT
+      retry: true
+      max_retries: 3
+    
+    servo_off:                    # Servo-Off (상태 9)
+      auto_servo_on: true
+      max_retries: 3
+      retry_delay: 1.0
+    
+    e_stop:                       # E-Stop (상태 5)
+      manual_intervention: true   # 수동 개입 필요
+      notify_user: true
+  
+  # 체크포인트 설정
+  checkpoint:
+    enabled: true
+    save_interval: 1              # 단계마다 저장
+    max_history: 10               # 최대 체크포인트 개수
+
+# ------------------------------------------
+# 10. 로깅 및 디버깅
+# ------------------------------------------
+logging:
+  # 로그 레벨 (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+  level: "INFO"
+  
+  # 로그 파일 설정
+  file:
+    enabled: true
+    path: "./logs/beauro.log"
+    max_size: 10                  # 최대 크기 (MB)
+    backup_count: 5               # 백업 파일 개수
+  
+  # 콘솔 출력
+  console:
+    enabled: true
+    format: "[%(levelname)s] %(message)s"
+  
+  # 디버그 모드
+  debug:
+    enabled: false
+    verbose_motion: false         # 모션 상세 로그
+    log_coordinates: false        # 좌표 로그
+    firebase_debug: false         # Firebase 통신 로그
+
+# ------------------------------------------
+# 11. 성능 최적화
+# ------------------------------------------
+performance:
+  # 병렬 처리
+  parallel_processing: false      # 다중 작업 병렬화 (실험적)
+  
+  # 경로 최적화
+  path_optimization:
+    enabled: true
+    algorithm: "shortest_path"    # shortest_path, smooth_path
+  
+  # 캐싱
+  cache:
+    enabled: true
+    coordinate_cache: true        # 좌표 계산 결과 캐싱
+    cache_size: 100               # 캐시 크기
+
+# ------------------------------------------
+# 12. 유지보수 및 캘리브레이션
+# ------------------------------------------
+maintenance:
+  # 캘리브레이션 주기 (일)
+  calibration_interval: 30
+  
+  # 마지막 캘리브레이션 날짜
+  last_calibration: "2025-12-19"
+  
+  # 작업 카운터 (자동 증가)
+  operation_count:
+    liquid: 0
+    powder: 0
+    stirring: 0
+    total: 0
+  
+  # 유지보수 알림
+  notifications:
+    enabled: true
+    email: "hyunjongkim0524@gmail.com"
+    alert_threshold: 1000         # 작업 횟수 임계값
+
+# ------------------------------------------
+# 13. 사용자 정의 설정
+# ------------------------------------------
+custom:
+  # 프로젝트별 설정
+  project_name: "BeauRo R&D Automation"
+  facility: "Laboratory A"
+  operator: "Default"
+  
+  # 실험 모드
+  experimental_features:
+    vision_integration: false     # 비전 시스템 (향후 확장)
+    ai_optimization: false        # AI 기반 최적화
+    multi_robot: false            # 다중 로봇 협업
+  
+  # 커스텀 파라미터
+  # 프로젝트별 필요에 따라 추가 가능
+  notes: |
+    - 이 설정 파일은 BeauRo 시스템의 핵심 파라미터를 관리합니다.
+    - 변경 시 robot_config.yaml.backup을 생성하여 백업하세요.
+    - 주요 변경사항은 Git으로 버전 관리하세요.
+
+# ==========================================
+# 설정 파일 끝
+# ==========================================

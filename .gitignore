@@ -2,3 +2,6 @@
 build
 install
 log
+
+# Firebase authentication
+serviceAccountKey.json
