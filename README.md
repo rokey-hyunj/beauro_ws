@@ -6,7 +6,6 @@
 ![ROS2](https://img.shields.io/badge/ROS2-Humble-blue?style=for-the-badge)
 ![Python](https://img.shields.io/badge/Python-3.8+-green?style=for-the-badge)
 ![Firebase](https://img.shields.io/badge/Firebase-Realtime_DB-orange?style=for-the-badge)
-![License](https://img.shields.io/badge/License-MIT-yellow?style=for-the-badge)
 
 **두산 로보틱스 M0609 협동로봇을 활용한 화장품 연구개발용 화학약품 자동배합 시스템**
 
